@@ -1,7 +1,4 @@
 import torch
-import s3prl.hub as hub
-import soundfile as sf
-import joblib
 import numpy as np
 
 # segment len penalty function
@@ -76,26 +73,34 @@ def segment(reps, kmeans_model, pen, lambd=35):
 
     return boundaries, label_tokens
 
-# Read input audio
-utterance = sf.read('/home/rogert/Desktop/198_audio_clean.flac')[0]
-utterance = torch.from_numpy(utterance).to(torch.float)
 
-# Obtain HuBERT 6th layer representations of input
-model = getattr(hub, 'hubert')()
-model.eval()
-reps = model([utterance])['hidden_state_6'].squeeze()
-reps = reps.detach().numpy()
+if __name__ == "__main__":
 
-# Perform k-means clustering with pretrained k-means model at https://dl.fbaipublicfiles.com/textless_nlp/gslm/hubert/km100/km.bin
-K = 100 # num of k-means clusters
-kmeans_model = joblib.load('/home/rogert/Desktop/code/km.bin')
+    import s3prl.hub as hub
+    import soundfile as sf
+    import joblib
 
-# Predict vector quantized tokens
-# tokens = kmeans_model.predict(reps).tolist()
-# print(tokens)
+    # Read input audio
+    utterance = sf.read('/home/rogert/data/LibriSpeech/train-clean-100/103/1240/103-1240-0000.flac')[0]
+    utterance = torch.from_numpy(utterance).to(torch.float)
 
-boundaries, label_tokens = segment(reps, kmeans_model, pen, 35)
-print(boundaries)
-print(label_tokens)
-print(f"Num of segments: {len(label_tokens)}")
+    # Obtain HuBERT 6th layer representations of input
+    model = getattr(hub, 'hubert')()
+    model.eval()
+    reps = model([utterance])['hidden_state_6'].squeeze()
+    reps = reps.detach().numpy()
+
+    # Perform k-means clustering with pretrained scikit-learn k-means model at https://github.com/pytorch/fairseq/tree/main/examples/textless_nlp/gslm/speech2unit
+    K = 100 # num of k-means clusters
+    kmeans_model = joblib.load('./km100.bin')
+
+    # Predict vector quantized tokens
+    tokens = kmeans_model.predict(reps).tolist()
+    print(f"tokens: {tokens}")
+    print(f"len(tokens): {len(tokens)}")
+
+    boundaries, label_tokens = segment(reps, kmeans_model, pen, 35)
+    print(f"boundaries: {boundaries}")
+    print(f"label_tokens: {label_tokens}")
+    print(f"Num of segments = {len(label_tokens)}")
 
